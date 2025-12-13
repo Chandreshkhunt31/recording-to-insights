@@ -1,0 +1,21 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+
+# Local outputs/results
+outputs/
+
+# Local input audio (keep out of git)
+data/*
+!data/.gitkeep
+
+# Uploaded/temp artifacts (if any)
+*.tmp
+
+
