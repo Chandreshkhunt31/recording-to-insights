@@ -22,6 +22,28 @@ class Settings(BaseSettings):
     data_dir: str = "./data"
     output_dir: str = "./outputs"
 
+    # PostgreSQL connection string, e.g.
+    # postgresql+psycopg://postgres:postgres@localhost:5432/insightrelay
+    database_url: str = "postgresql+psycopg://chandresh:1111@localhost:5432/insightrelay"
+
+    # CORS (comma-separated). In Render, set this to your frontend URL(s).
+    cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    def database_url_sqlalchemy(self) -> str:
+        """
+        Render often provides DATABASE_URL like: postgres://user:pass@host:5432/db
+        SQLAlchemy expects: postgresql+psycopg://...
+        """
+        url = (self.database_url or "").strip()
+        if url.startswith("postgres://"):
+            return "postgresql+psycopg://" + url[len("postgres://") :]
+        if url.startswith("postgresql://"):
+            return "postgresql+psycopg://" + url[len("postgresql://") :]
+        return url
+
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in (self.cors_allow_origins or "").split(",") if o.strip()]
+
 
 settings = Settings()
 

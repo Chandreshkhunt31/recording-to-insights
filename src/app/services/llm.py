@@ -53,13 +53,13 @@ STYLE GUIDELINES:
 
 - Write in calm, grounded, human language.
 
-- Use complete sentences, short paragraphs, and clear section headers.
+- Use complete sentences and short paragraphs where appropriate for clarity and client readability.
 
 - Do not over-summarize; prioritize meaning over detail.
 
 - When uncertain, soften language (e.g., “appeared to,” “seemed to,” “may have”).
 
-You must follow the output structure exactly as defined in the user instructions.
+You must follow the output structure and output format exactly as defined in the user instructions.
 """
 
 
@@ -69,76 +69,73 @@ Your task is to generate a structured deliverable titled:
 
 “Session Insight & Relationship Pattern Summary”
 
-Use ONLY the information present in the transcript.  
-Do NOT infer facts, histories, or intentions that are not supported by the conversation.
+The output will be shown directly to clients inside a professional, enterprise-grade dashboard.
+Clarity, readability, and visual structure are critical.
+
+Use ONLY the information present in the transcript.
+Do NOT infer facts, histories, diagnoses, or intentions not supported by the conversation.
 
 ==============================
+
 TRANSCRIPT
+
 ==============================
 
 {{FULL_SESSION_TRANSCRIPT}}
 
 ==============================
 
-Generate the output using the following structure:
+CRITICAL FORMATTING & PRESENTATION REQUIREMENTS (VERY IMPORTANT):
 
----
+- Use clear section headers exactly as specified below.
+- Ensure generous spacing between sections (logical paragraph breaks).
+- Prefer short paragraphs (2–4 lines max).
+- Use **bold text** selectively to highlight key phrases or concepts (represented as plain text).
+- Use bullet points only where they improve clarity.
+- Avoid dense blocks of text.
+- Use **formal, minimal emojis** sparingly to guide the reader (e.g., 🧭 🔍 💬 ✨ ❓).
+- Emojis must support clarity, not decoration.
+- Tone must remain professional, grounded, and client-safe.
+- Do NOT include meta commentary, explanations, or instructions in the content.
 
-### 1. Session Overview
-Provide a brief, neutral overview of the main themes discussed in this session.
-Focus on:
-- the central topics
-- the emotional tone
-- how the conversation progressed overall
-Avoid assigning fault or conclusions.
+The output must feel:
+- grounded
+- reflective
+- respectful
+- easy to read on screen
 
----
+--------------------------------
 
-### 2. Core Relationship Dynamics Observed
-Identify recurring interaction patterns or relational dynamics that appeared during the conversation.
-These may include:
-- cycles of misunderstanding
-- differences in emotional expression
-- moments where tension escalated or eased
-Describe patterns carefully, without labels or judgment.
+Generate the output using the following structure EXACTLY.
+Do not rename sections.
+Do not reorder sections.
+Do not add or remove sections.
 
----
+OUTPUT FORMAT REQUIREMENT (CRITICAL):
 
-### 3. Expressed Needs and Concerns (As Heard)
-Summarize the needs, concerns, or longings expressed by each participant, as they appeared in the session.
-Guidelines:
-- Reflect what was said or implied, not what “should” be felt
-- Keep descriptions balanced and respectful
-- If multiple participants are present, separate them clearly
+- Output MUST be valid JSON only (no markdown, no extra text).
+- Use the keys EXACTLY as specified.
+- Each value MUST be an array of strings.
+  - For the first four sections, each string should be a short paragraph (2–4 lines max).
+  - For reflective questions, each string should be a single question (no numbering).
 
----
+Return this exact JSON schema:
 
-### 4. Moments of Alignment, Understanding, or Repair
-Highlight moments in the session where:
-- understanding improved
-- empathy was expressed
-- communication softened
-- perspectives shifted constructively
-These moments may be brief but meaningful.
+{
+  "session_overview": ["..."],
+  "core_relationship_dynamics_observed": ["..."],
+  "expressed_needs_and_concerns_as_heard": ["..."],
+  "moments_of_alignment_understanding_or_repair": ["..."],
+  "reflective_questions_for_consideration": ["...", "...", "..."]
+}
 
----
+CONTENT REQUIREMENTS:
 
-### 5. Reflective Questions for Consideration
-Provide 3–5 open-ended reflective questions designed to help participants:
-- think about what resonated
-- notice patterns they recognize
-- consider what felt different by the end of the session
-Questions should invite reflection, not action or advice.
-
----
-
-FINAL CHECK BEFORE RESPONDING:
-- Is the language safe to share directly with clients?
-- Does the output remain faithful to the transcript?
-- Are all sections present and clearly written?
-
-If yes, provide the final formatted output.
+- Use ONLY the transcript.
+- No diagnoses, no blame, no therapy jargon unless clearly implied.
+- Keep language safe to show directly to clients.
 """
+
 
 
 @dataclass(frozen=True)
@@ -166,11 +163,11 @@ def run_llm_on_transcript(transcript: str) -> LLMResult:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
+            response_format={"type": "json_object"},
             temperature=0.2,
         )
         text = (resp.choices[0].message.content or "").strip()
-        # Your prompt requests a formatted sectioned output, not JSON.
-        parsed = None
+        parsed = _try_parse_json(text)
         return LLMResult(
             raw_text=text,
             parsed_json=parsed,
@@ -178,20 +175,20 @@ def run_llm_on_transcript(transcript: str) -> LLMResult:
             model=settings.openai_chat_model,
         )
 
+    stub = {
+        "session_overview": ["Stub mode: configure OPENAI_API_KEY for real insights."],
+        "core_relationship_dynamics_observed": ["Stub mode."],
+        "expressed_needs_and_concerns_as_heard": ["Stub mode."],
+        "moments_of_alignment_understanding_or_repair": ["Stub mode."],
+        "reflective_questions_for_consideration": [
+            "What felt most important in this session?",
+            "What patterns did you notice in how you each responded?",
+            "What felt different by the end of the session, if anything?",
+        ],
+    }
     return LLMResult(
-        raw_text=(
-            "### 1. Session Overview\n"
-            "Stub mode: configure OPENAI_API_KEY for real insights.\n\n"
-            "### 2. Core Relationship Dynamics Observed\n"
-            "Stub mode.\n\n"
-            "### 3. Expressed Needs and Concerns (As Heard)\n"
-            "Stub mode.\n\n"
-            "### 4. Moments of Alignment, Understanding, or Repair\n"
-            "Stub mode.\n\n"
-            "### 5. Reflective Questions for Consideration\n"
-            "- What felt most important in this session?\n"
-        ),
-        parsed_json=None,
+        raw_text=json.dumps(stub, ensure_ascii=False),
+        parsed_json=stub,
         provider="stub",
         model="stub",
     )
@@ -201,6 +198,15 @@ def _try_parse_json(text: str) -> dict[str, Any] | None:
     try:
         val = json.loads(text)
         if isinstance(val, dict):
+            required = [
+                "session_overview",
+                "core_relationship_dynamics_observed",
+                "expressed_needs_and_concerns_as_heard",
+                "moments_of_alignment_understanding_or_repair",
+                "reflective_questions_for_consideration",
+            ]
+            if all(k in val for k in required):
+                return val
             return val
     except Exception:
         return None

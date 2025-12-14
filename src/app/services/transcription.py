@@ -11,6 +11,7 @@ from ..core.config import settings
 @dataclass(frozen=True)
 class TranscriptionResult:
     transcript: str
+    segments: list[dict] | None
     provider: str
     model: str
 
@@ -38,15 +39,49 @@ def transcribe_audio(file_path: str) -> TranscriptionResult:
                 "or switch to local Whisper."
             )
         client = OpenAI(api_key=settings.openai_api_key)
+        segments: list[dict] | None = None
         with open(p, "rb") as f:
-            resp = client.audio.transcriptions.create(
-                model=settings.openai_transcription_model,
-                file=f,
-            )
-        # openai returns a structured object; `.text` is the transcript string
-        transcript = getattr(resp, "text", None) or ""
+            # Try to get timestamped segments (time-based transcript).
+            try:
+                resp = client.audio.transcriptions.create(
+                    model=settings.openai_transcription_model,
+                    file=f,
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"],
+                )
+                transcript = getattr(resp, "text", None) or ""
+                raw_segments = getattr(resp, "segments", None)
+                if isinstance(raw_segments, list):
+                    norm: list[dict] = []
+                    for s in raw_segments:
+                        if isinstance(s, dict):
+                            norm.append(
+                                {
+                                    "start": s.get("start"),
+                                    "end": s.get("end"),
+                                    "text": s.get("text") or "",
+                                }
+                            )
+                        else:
+                            norm.append(
+                                {
+                                    "start": getattr(s, "start", None),
+                                    "end": getattr(s, "end", None),
+                                    "text": getattr(s, "text", "") or "",
+                                }
+                            )
+                    segments = norm
+            except Exception:
+                # Fallback to plain text transcript.
+                f.seek(0)
+                resp = client.audio.transcriptions.create(
+                    model=settings.openai_transcription_model,
+                    file=f,
+                )
+                transcript = getattr(resp, "text", None) or ""
         return TranscriptionResult(
             transcript=transcript,
+            segments=segments,
             provider="openai",
             model=settings.openai_transcription_model,
         )
@@ -57,6 +92,7 @@ def transcribe_audio(file_path: str) -> TranscriptionResult:
             "STUB_TRANSCRIPT: OpenAI is not configured (OPENAI_API_KEY missing). "
             "Upload received and saved; replace this with real transcription by setting the key."
         ),
+        segments=None,
         provider="stub",
         model="stub",
     )

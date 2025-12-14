@@ -19,6 +19,24 @@ def ensure_dir(path: str) -> None:
     Path(path).mkdir(parents=True, exist_ok=True)
 
 
+def write_json_file(path: str, payload: dict[str, Any]) -> None:
+    out_path = Path(path)
+    ensure_dir(str(out_path.parent))
+    tmp_path = str(out_path) + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, out_path)
+
+
+def read_json_file(path: str) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        val = json.load(f)
+    if not isinstance(val, dict):
+        raise ValueError("JSON file did not contain an object")
+    return val
+
+
 def store_json(output_dir: str, payload: dict[str, Any]) -> StoredResult:
     ensure_dir(output_dir)
 
@@ -34,12 +52,9 @@ def store_json(output_dir: str, payload: dict[str, Any]) -> StoredResult:
         **payload,
     }
 
-    tmp_path = str(out_path) + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(to_write, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    os.replace(tmp_path, out_path)
+    write_json_file(str(out_path), to_write)
 
     return StoredResult(result_id=result_id, path=str(out_path))
+
 
 
