@@ -537,15 +537,26 @@ export default function InsightRelayApp() {
 // --- PAGE: LOGIN ---
 
 function LoginPage({ onLogin }: { onLogin: () => void }) {
+  const demoEmail = "Henk@insightrelay.com";
+  const demoPassword = "Henk@insightrelay.com";
+  const [email, setEmail] = useState(demoEmail);
+  const [password, setPassword] = useState(demoPassword);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    const normalizedEmail = email.trim();
+    if (normalizedEmail !== demoEmail || password !== demoPassword) {
+      setError("Invalid credentials. Use the provided demo email and password.");
+      return;
+    }
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
       onLogin();
-    }, 800);
+    }, 500);
   };
 
   return (
@@ -564,7 +575,15 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Work Email</Label>
-                <Input id="email" type="email" placeholder="name@company.com" required className="bg-slate-50" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@company.com"
+                  required
+                  className="bg-slate-50"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -573,8 +592,16 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
                     Forgot password?
                   </a>
                 </div>
-                <Input id="password" type="password" required className="bg-slate-50" />
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  className="bg-slate-50"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
+              {error ? <p className="text-xs text-red-600">{error}</p> : null}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
@@ -608,12 +635,20 @@ function DashboardLayout({
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const NavItem = ({ icon: Icon, label, path, active }: any) => (
+  const NavItem = ({ icon: Icon, label, path, active, disabled }: any) => (
     <button
-      onClick={() => onNavigate(path)}
+      onClick={() => {
+        if (disabled) return;
+        onNavigate(path);
+      }}
+      disabled={disabled}
       className={cn(
         "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-        active ? "bg-purple-50 text-purple-900" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+        disabled
+          ? "text-slate-400 cursor-not-allowed"
+          : active
+          ? "bg-purple-50 text-purple-900"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
       )}
     >
       <Icon className="h-4 w-4" />
@@ -639,7 +674,7 @@ function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform duration-200 md:relative md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform duration-200 md:translate-x-0 md:sticky md:top-0 md:h-screen",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -650,11 +685,11 @@ function DashboardLayout({
 
         <div className="flex flex-col justify-between h-[calc(100vh-64px)] p-4">
           <nav className="space-y-1">
-            <NavItem icon={LayoutDashboard} label="Dashboard" path="/dashboard" active={currentPath === "/dashboard"} />
-            <NavItem icon={History} label="Job History" path="/dashboard" active={false} />
+            <NavItem icon={LayoutDashboard} label="Dashboard" path="/dashboard" active={currentPath === "/dashboard"} disabled={false} />
+            <NavItem icon={History} label="Job History" path="/dashboard" active={false} disabled />
             <div className="pt-4">
               <p className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Workspace</p>
-              <NavItem icon={Settings} label="Settings" path="#" active={false} />
+              <NavItem icon={Settings} label="Settings" path="#" active={false} disabled />
             </div>
           </nav>
 
@@ -710,6 +745,7 @@ function DashboardPage({
   const [progress, setProgress] = useState(0);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const refreshJobs = async () => {
     try {
@@ -842,12 +878,19 @@ function DashboardPage({
                 )}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
-                onClick={() => !file && document.getElementById("file-upload")?.click()}
+                onClick={() => {
+                  // Always allow re-open of file picker; clear value first to re-select same file.
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                    fileInputRef.current.click();
+                  }
+                }}
               >
                 <input
                   id="file-upload"
                   type="file"
                   className="hidden"
+                  ref={fileInputRef}
                   accept=".mp3,.wav,.m4a"
                   onChange={(e) => {
                     if (e.target.files?.[0]) {
@@ -863,12 +906,26 @@ function DashboardPage({
                       <FileAudio className="h-6 w-6 text-purple-600" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-medium text-slate-900 truncate">{file.name}</p>
+                      <p className="font-medium text-slate-900 leading-6 break-words whitespace-normal">
+                        {file.name}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {(file.size / 1024 / 1024).toFixed(2)} MB • Ready to process
                       </p>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setFile(null); }}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                          fileInputRef.current.click();
+                        } else {
+                          setFile(null);
+                        }
+                      }}
+                    >
                       Replace
                     </Button>
                   </div>
@@ -962,7 +1019,7 @@ function DashboardPage({
                 </div>
               )}
             </CardContent>
-            <CardFooter className="flex-col items-start gap-4 border-t bg-slate-50/50">
+            <CardFooter className="flex-col items-start gap-4 border-t bg-slate-50/50 mt-4 pt-4">
               <div className="flex w-full gap-4">
                 <Button className="w-full md:w-auto min-w-[140px]" onClick={startProcessing} disabled={!file || !selectedOptionId || processState !== "idle"}>
                   {processState !== "idle" ? (
@@ -1183,10 +1240,9 @@ function ResultPage({
           <Button variant="outline" onClick={handleCopy}>
             <Copy className="mr-2 h-4 w-4" /> Copy Output
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" disabled>
             <Download className="mr-2 h-4 w-4" /> Download PDF
           </Button>
-          <Button onClick={() => addToast("Job Restarted", "Sending back to processing queue...")}>Process Again</Button>
         </div>
       </div>
 
@@ -1194,12 +1250,12 @@ function ResultPage({
         {/* LEFT COLUMN: Transcript */}
         <div className="md:col-span-4 h-full flex flex-col">
           <Card className="flex-1 flex flex-col overflow-hidden h-full">
-            <div className="flex items-center border-b border-slate-200 px-1">
+            <div className="flex items-center border-b border-slate-200 px-3 py-2">
               <button
                 onClick={() => setActiveTab("transcript")}
                 className={cn(
-                  "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                  activeTab === "transcript" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  activeTab === "transcript" ? "bg-purple-100 text-purple-700" : "text-slate-500 hover:text-slate-700"
                 )}
               >
                 Transcript
@@ -1207,8 +1263,8 @@ function ResultPage({
               <button
                 onClick={() => setActiveTab("metadata")}
                 className={cn(
-                  "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                  activeTab === "metadata" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                  "ml-2 px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  activeTab === "metadata" ? "bg-purple-100 text-purple-700" : "text-slate-500 hover:text-slate-700"
                 )}
               >
                 Metadata
@@ -1217,19 +1273,33 @@ function ResultPage({
 
             {activeTab === "transcript" && (
               <>
-                <div className="p-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                  <div className="relative w-full max-w-[200px]">
-                    <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-slate-400" />
+                <div className="p-4 space-y-3 border-b border-slate-100 bg-white">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
-                      className="h-7 w-full rounded-md border border-slate-200 bg-white pl-7 pr-3 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      placeholder="Search text..."
+                      className="w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      placeholder="Search transcript..."
                     />
                   </div>
-                  <button onClick={() => setShowTimestamps(!showTimestamps)} className="text-xs text-slate-500 hover:text-purple-600 font-medium">
-                    {showTimestamps ? "Hide" : "Show"} Time
-                  </button>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-700">Show timestamps</span>
+                    <button
+                      onClick={() => setShowTimestamps(!showTimestamps)}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-colors flex items-center px-1",
+                        showTimestamps ? "bg-purple-600" : "bg-slate-200"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "h-4 w-4 rounded-full bg-white shadow transition-transform",
+                          showTimestamps ? "translate-x-6" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 p-4 space-y-4 h-96 overflow-y-auto">
                   {segments.length > 0
                     ? segments.map((seg, i) => (
                         <div key={i} className="text-sm">
@@ -1310,7 +1380,7 @@ function ResultPage({
               ) : (
                 <>
                   <section>
-                    <h3 className="text-lg font-bold text-slate-900 mb-3">Session Overview</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-3 pt-2">Session Overview</h3>
                     <Paragraphs items={insights?.session_overview} />
                   </section>
 
