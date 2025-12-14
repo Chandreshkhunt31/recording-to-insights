@@ -511,7 +511,7 @@ export default function InsightRelayApp() {
         <DashboardLayout
           currentPath={currentPath}
           onNavigate={navigate}
-          user={{ name: "Alex Chen", email: "alex@enterprise.co" }}
+          user={{ name: "Henk", email: "Henk@insightrelay.com" }}
         >
           {currentPath === "/dashboard" && (
             <DashboardPage
